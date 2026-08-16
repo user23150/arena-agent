@@ -55,10 +55,21 @@ from arena.handler_helpers import authed, err_json, parse_json_body
 from arena.security_commands import command_allowlist_reason
 from arena.web_utils import CORS_HEADERS
 
-_BLOCKED_ENV_PATTERNS = [
-    "ARENA_TOKEN", "TOKEN", "SECRET", "PASSWORD", "KEY",
-    "LD_PRELOAD", "LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONSTARTUP",
-]
+_EXACT_BLOCKED_ENV = {
+    # Windows 核心
+    "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR",
+    "APPDATA", "LOCALAPPDATA", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
+    "APPINIT_DLLS", "PSMODULEPATH", "AUTORUN",
+    # POSIX 核心
+    "IFS", "BASH_ENV", "ENV", "ZDOTDIR",
+    "GIT_CONFIG_PARAMETERS", "GIT_SSH_COMMAND",
+}
+
+_PATTERN_BLOCKED_ENV = {
+    "TOKEN", "SECRET", "PASSWORD", "KEY",
+    "LD_PRELOAD", "LD_LIBRARY_PATH",
+    "PYTHONPATH", "PYTHONSTARTUP",
+}
 
 @dataclass(frozen=True)
 class ExecHandlers:
@@ -145,10 +156,20 @@ def make_exec_handlers(ctx: ExecHandlerContext) -> ExecHandlers:
         env_extra: dict[str, Any] = dict(raw_env) if isinstance(raw_env, dict) else {}
         env = os.environ.copy()
         for key in list(env_extra.keys()):
-            for blocked in _BLOCKED_ENV_PATTERNS:
-                if blocked in key.upper():
-                    del env_extra[key]
+            key_upper = key.upper()
+    # 1. 精确匹配：如果变量名完全匹配，直接屏蔽
+            if key_upper in _EXACT_BLOCKED_ENV:
+                del env_extra[key]
+                continue
+    # 2. 模式匹配：如果变量名包含敏感关键词，也屏蔽
+            blocked = False
+            for pattern in _PATTERN_BLOCKED_ENV:
+                if pattern in key_upper:
+                    blocked = True
                     break
+            if blocked:
+                del env_extra[key]
+                continue
         env.update({str(k): str(v) for k, v in env_extra.items()})
 
         sem: asyncio.Semaphore = cfg["semaphore"]
