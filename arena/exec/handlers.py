@@ -56,11 +56,11 @@ from arena.security_commands import command_allowlist_reason
 from arena.web_utils import CORS_HEADERS
 
 _EXACT_BLOCKED_ENV = {
-    # Windows 核心
+    # Windows corn
     "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR",
     "APPDATA", "LOCALAPPDATA", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
     "APPINIT_DLLS", "PSMODULEPATH", "AUTORUN",
-    # POSIX 核心
+    # POSIX corn
     "IFS", "BASH_ENV", "ENV", "ZDOTDIR",
     "GIT_CONFIG_PARAMETERS", "GIT_SSH_COMMAND",
 }
@@ -157,11 +157,9 @@ def make_exec_handlers(ctx: ExecHandlerContext) -> ExecHandlers:
         env = os.environ.copy()
         for key in list(env_extra.keys()):
             key_upper = key.upper()
-    # 1. 精确匹配：如果变量名完全匹配，直接屏蔽
             if key_upper in _EXACT_BLOCKED_ENV:
                 del env_extra[key]
                 continue
-    # 2. 模式匹配：如果变量名包含敏感关键词，也屏蔽
             blocked = False
             for pattern in _PATTERN_BLOCKED_ENV:
                 if pattern in key_upper:
